@@ -10,6 +10,7 @@ import org.springframework.validation.BindingResult; // ★ インポートを�
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 public class TaskController {
@@ -23,9 +24,21 @@ public class TaskController {
 
     // ========== R (Read) - タスクの一覧表示と新規タスク登録フォームを表示 ==========
     @GetMapping("/")
-    public String list(Model model) {
+    public String list(//検索キーワードを受け取る（無ければ null が入る
+            @RequestParam(required = false) String keyword,
+            Model model) {
         // DBから全タスクを取得し、画面（HTML）に渡す
-        Iterable<Task> tasks = repository.findAll();
+        Iterable<Task> tasks;
+        
+        if (keyword != null && !keyword.isEmpty()) {
+            // キーワードがある場合: 検索メソッドを実行する
+            tasks = repository.findByContentContaining(keyword); // ★ 検索結果を代入
+            model.addAttribute("message", "キーワード「" + keyword + "」で検索しました。");
+            
+        } else {
+            // キーワードがない場合: 全タスクを取得する
+            tasks = repository.findAllByIsDoneFalseOrderByPriorityAscDeadlineAsc();
+        }
         model.addAttribute("tasks", tasks);
         
         // ★ ここから追加: Thymeleaf に「空のTaskオブジェクト」を渡す ★
