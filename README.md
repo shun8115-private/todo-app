@@ -1,4 +1,6 @@
 # Simple TODO Application 📝
+<img width="669" height="448" alt="スクリーンショット 2025-12-27 19 14 34" src="https://github.com/user-attachments/assets/db37d129-6815-40a0-9991-51a4d82a5ccf" />
+
 
 Spring Boot で開発した、多機能なタスク管理アプリケーションです。
 単なる CRUD 機能だけでなく、実務を意識した「サービス層の分離」や「高度な検索・ソート機能」を実装しています。
