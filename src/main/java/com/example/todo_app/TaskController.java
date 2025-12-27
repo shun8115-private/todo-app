@@ -1,25 +1,25 @@
 package com.example.todo_app;
 
-import java.util.Optional;
-
-import jakarta.validation.Valid; // ★ インポートを追加
-
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult; // ★ インポートを追加
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
+@RequestMapping("/")
 public class TaskController {
 
-    private final TaskRepository repository;
+	private final TaskService taskService; // ★ TaskServiceに変更
 
-    // コンストラクタ：Repositoryを自動で使えるようにする（DI）
-    public TaskController(TaskRepository repository) {
-        this.repository = repository;
+	// コンストラクタもTaskServiceを受け取るように修正
+    public TaskController(TaskService taskService) { // ★ TaskServiceに変更
+        this.taskService = taskService;
     }
 
     // ========== R (Read) - タスクの一覧表示と新規タスク登録フォームを表示 ==========
@@ -27,23 +27,21 @@ public class TaskController {
     public String list(//検索キーワードを受け取る（無ければ null が入る
             @RequestParam(required = false) String keyword,
             Model model) {
-        // DBから全タスクを取得し、画面（HTML）に渡す
-        Iterable<Task> tasks;
+    	
+    	// ★ ロジックをService層に移譲
+        Iterable<Task> tasks = taskService.findTasks(keyword);
+        
+        model.addAttribute("tasks", tasks);
+        model.addAttribute("task", new Task());
         
         if (keyword != null && !keyword.isEmpty()) {
             // キーワードがある場合: 検索メソッドを実行する
-            tasks = repository.findByContentContaining(keyword); // ★ 検索結果を代入
             model.addAttribute("message", "キーワード「" + keyword + "」で検索しました。");
             
         } else {
             // キーワードがない場合: 全タスクを取得する
-            tasks = repository.findAllByIsDoneFalseOrderByPriorityAscDeadlineAsc();
+        	model.addAttribute("message", "完了したタスクは非表示です。");
         }
-        model.addAttribute("tasks", tasks);
-        
-        // ★ ここから追加: Thymeleaf に「空のTaskオブジェクト」を渡す ★
-        // これにより、list.html で #fields.hasErrors を安全に使えるようになる
-        model.addAttribute("task", new Task());
         
         // "list.html" テンプレートを呼び出す
         return "list";
@@ -51,30 +49,14 @@ public class TaskController {
     
     // ========== C (Create) - タスクの追加処理 ==========
     @PostMapping("/add")
-    public String add(                      
-                      // ★ ここから追加: Formデータとバリデーション結果を受け取る ★
-                      @Valid Task newTask, // Taskオブジェクトとしてデータを検証
-                      BindingResult bindingResult, // 検証結果を受け取る
-                      Model model){
+    public String add(@Validated @ModelAttribute Task task, 
+            		BindingResult result){
     	
-    	// --- ★ 検証ロジックの追加 ★ ---
-        if (bindingResult.hasErrors()) {
-            // エラーがあった場合、タスク一覧を再取得して画面にエラーを表示
-            Iterable<Task> tasks = repository.findAll();
-            model.addAttribute("tasks", tasks);
-            // エラーメッセージは BindingResult が自動で画面に渡します
-            
-            // 入力した値（newTask）を画面に保持したまま、list.htmlに戻る
-            return "list"; 
+    	if (result.hasErrors()) {
+            return "list";
         }
-        // --- ★ 検証ロジックの追加ここまで ★ ---
-        
-     // 【重要】未完了の状態（isDone=false）を設定し、IDはDBに任せる
-        newTask.setDone(false);
-        
-        repository.save(newTask);
-        
-        // トップページにリダイレクトして一覧画面に戻す
+        // ★ ロジックをService層に移譲
+        taskService.add(task);
         return "redirect:/";
     }
 
@@ -82,22 +64,16 @@ public class TaskController {
     @PostMapping("/complete/{id}")
     public String complete(@PathVariable Long id) {
         // IDでタスクを検索
-        Optional<Task> taskOpt = repository.findById(id);
-        if (taskOpt.isPresent()) {
-            Task task = taskOpt.get();
-            // 完了状態を反転させる（完了なら未完了に、未完了なら完了に）
-            task.setDone(!task.isDone());
-            // DBに保存する（更新）
-            repository.save(task);
-        }
+    	// ★ ロジックをService層に移譲
+        taskService.toggleDone(id);
         return "redirect:/";
     }
 
     // ========== D (Delete) - タスクの削除処理 ==========
     @PostMapping("/delete/{id}")
     public String delete(@PathVariable Long id) {
-        // IDを指定してDBからタスクを削除
-        repository.deleteById(id);
+    	// ★ ロジックをService層に移譲
+        taskService.delete(id);
         return "redirect:/";
     }
 }
